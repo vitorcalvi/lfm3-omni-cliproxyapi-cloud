@@ -10,14 +10,14 @@ Standalone Docker bundle. It renders `/tmp/config.yaml` at startup from env vars
 | `HF_SPACE_API_KEY` | no | Enables `hf-zerogpu-gguf` and `hf-zerogpu-bf16` |
 | `LIQUID_API_KEY` | no | Enables `liquid-ai-managed` |
 | `CF_GATEWAY_API_KEY` | no | Enables `cf-free-gateway` (sends `User-Agent: Ava-LFM3-Client/1.0`) |
-| `ROUTING_STRATEGY` | no | `round-robin` (default), `weighted-round-robin`, `fill-first` |
+| `ROUTING_STRATEGY` | no | `fill-first` (default), `round-robin`, `weighted-round-robin` |
 | `PORT` | no | Listen port, default `8317` (platforms like Render inject it) |
 
 At least one upstream key is required. A provider is included only if its key is non-empty. At least one provider must be enabled or the container exits.
 
 ## Models
 
-- `lfm3-omni-2b`: pooled across all enabled providers, with failover
+- `lfm3-omni-2b`: pooled across `hf-zerogpu-gguf` → `hf-zerogpu-bf16` → `liquid-ai-managed` (fill-first, with failover); `cf-free-gateway` is direct-only via `lfm3-omni-cf`
 - `lfm3-omni-hf-gguf`, `lfm3-omni-hf-gpu`, `lfm3-omni-liquid`, `lfm3-omni-cf`: direct, one backend each
 
 Retry: `routing.retry.request-retry: 3`, `max-retry-interval: 15`.

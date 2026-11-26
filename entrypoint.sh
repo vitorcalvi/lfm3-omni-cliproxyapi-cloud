@@ -3,7 +3,7 @@
 set -euo pipefail
 
 PORT="${PORT:-8317}"
-ROUTING_STRATEGY="${ROUTING_STRATEGY:-round-robin}"
+ROUTING_STRATEGY="${ROUTING_STRATEGY:-fill-first}"
 CONFIG_OUT="${CONFIG_OUT:-/tmp/config.yaml}"
 CPA_BIN="${CPA_BIN:-/opt/cpa/cli-proxy-api}"
 AUTH_DIR="${AUTH_DIR:-/tmp/cpa-auth}"
@@ -14,16 +14,18 @@ if [ -z "${CPA_CLIENT_KEY:-}" ]; then
   exit 1
 fi
 
-provider() { # name base-url upstream-model direct-alias key
+provider() { # name base-url upstream-model direct-alias key extra-yaml pooled(1|0)
+  local pool=""
+  if [ "${7:-1}" = "1" ]; then
+    pool=$'        - name: "'"$3"$'"\n          alias: "lfm3-omni-2b"\n'
+  fi
   cat <<EOF
     - name: "$1"
       base-url: "$2"
 $6      keys:
         - api-key: "$5"
       models:
-        - name: "$3"
-          alias: "lfm3-omni-2b"
-        - name: "$3"
+${pool}        - name: "$3"
           alias: "$4"
 EOF
 }
@@ -64,7 +66,7 @@ EOF
     n=$((n+1))
   fi
   if [ -n "${CF_GATEWAY_API_KEY:-}" ]; then
-    provider cf-free-gateway "https://lfm3-omni-free-gateway.vitorcalvi.workers.dev/v1" "LiquidAI/LFM3-Omni-2B" lfm3-omni-cf "$CF_GATEWAY_API_KEY" $'      headers:\n        User-Agent: "Ava-LFM3-Client/1.0"\n'
+    provider cf-free-gateway "https://lfm3-omni-free-gateway.vitorcalvi.workers.dev/v1" "LiquidAI/LFM3-Omni-2B" lfm3-omni-cf "$CF_GATEWAY_API_KEY" $'      headers:\n        User-Agent: "Ava-LFM3-Client/1.0"\n' 0
     n=$((n+1))
   fi
   if [ "$n" -eq 0 ]; then

@@ -17,4 +17,4 @@ services:
       - key: CF_GATEWAY_API_KEY
         sync: false
       - key: ROUTING_STRATEGY
-        value: round-robin
+        value: fill-first
