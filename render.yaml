@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: cliproxyapi-lfm3-omni
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    autoDeploy: false
+    envVars:
+      - key: CPA_CLIENT_KEY
+        generateValue: true
+      - key: HF_SPACE_API_KEY
+        sync: false
+      - key: LIQUID_API_KEY
+        sync: false
+      - key: CF_GATEWAY_API_KEY
+        sync: false
+      - key: ROUTING_STRATEGY
+        value: round-robin
