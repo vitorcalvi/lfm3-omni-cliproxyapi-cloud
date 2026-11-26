@@ -18,3 +18,5 @@ services:
         sync: false
       - key: ROUTING_STRATEGY
         value: fill-first
+      - key: ALLOW_BILLABLE_PROVIDERS
+        value: "0"

@@ -6,26 +6,33 @@ Standalone Docker bundle. It renders `/tmp/config.yaml` at startup from env vars
 
 | Var | Required | Purpose |
 |---|---|---|
-| `CPA_CLIENT_KEY` | yes | Key clients send as `Authorization: Bearer ...` (`access.api-keys`) |
+| `CPA_CLIENT_KEY` | yes | Min 24 chars (startup fails otherwise). Key clients send as `Authorization: Bearer ...` (`access.api-keys`) |
 | `HF_SPACE_API_KEY` | no | Enables `hf-zerogpu-gguf` and `hf-zerogpu-bf16` |
-| `LIQUID_API_KEY` | no | Enables `liquid-ai-managed` |
+| `LIQUID_API_KEY` | no | Used only when `ALLOW_BILLABLE_PROVIDERS=1` |
 | `CF_GATEWAY_API_KEY` | no | Enables `cf-free-gateway` (sends `User-Agent: Ava-LFM3-Client/1.0`) |
 | `ROUTING_STRATEGY` | no | `fill-first` (default), `round-robin`, `weighted-round-robin` |
-| `PORT` | no | Listen port, default `8317` (platforms like Render inject it) |
+| `ALLOW_BILLABLE_PROVIDERS` | no | `0` (default). `1` enables `liquid-ai-managed` (potentially billable) and pools it as fallback |
+| `PORT` | no | Listen port (validated 1..65535), default `8317` (platforms like Render inject it) |
 
-At least one upstream key is required. A provider is included only if its key is non-empty. At least one provider must be enabled or the container exits.
+At least one enabled upstream is required. A provider is included only if its key is non-empty. At least one provider must be enabled or the container exits.
 
 ## Models
 
-- `lfm3-omni-2b`: pooled across `hf-zerogpu-gguf` → `hf-zerogpu-bf16` → `liquid-ai-managed` (fill-first, with failover); `cf-free-gateway` is direct-only via `lfm3-omni-cf`
+- `lfm3-omni-2b`: pooled across `hf-zerogpu-gguf` → `hf-zerogpu-bf16` (→ `liquid-ai-managed` only if `ALLOW_BILLABLE_PROVIDERS=1`) (fill-first, with failover); `cf-free-gateway` is direct-only via `lfm3-omni-cf`
 - `lfm3-omni-hf-gguf`, `lfm3-omni-hf-gpu`, `lfm3-omni-liquid`, `lfm3-omni-cf`: direct, one backend each
 
-Retry: `routing.retry.request-retry: 3`, `max-retry-interval: 15`.
+Retry: `routing.retry.request-retry: 2`, `max-retry-interval: 15`.
 
 ## Security
 
 - Management API is off: `management.secret-key` is empty (routes return 404) and the control panel is disabled.
 - `/v1/*` returns 401 without a valid `CPA_CLIENT_KEY`. `GET /` is unauthenticated and returns 200, so it is used as the health check.
+- Startup fails closed: `PORT` must be 1..65535, `ROUTING_STRATEGY` must be `fill-first|round-robin|weighted-round-robin`, secrets may not contain control characters, and the rendered config must keep `management` disabled. All values are written as escaped YAML single-quoted scalars.
+- Config and auth dir are created with `umask 077` (0600 / 0700), written atomically, symlinks refused.
+- Image: base pinned by digest, CLIProxyAPI tarball verified by SHA-256 at build, multi-stage (no curl in final image), root-owned 0555 binaries, runs as UID 10001. Render auto-deploy is off.
+- Free-only by default: the potentially billable Liquid provider is never used unless `ALLOW_BILLABLE_PROVIDERS=1`. Upstream spend limits must be set in provider dashboards; Render's free tier is not a spending control.
+- Secret rotation: rotate `CPA_CLIENT_KEY` (Render env → regenerate) and upstream keys at the provider, update in the dashboard, then redeploy manually. Rotate immediately on any suspected exposure.
+- Acceptance test after deploy (the binary's schema is not verifiable offline): `/v1/models` without a key → 401; with key → 200; `/v0/management/*` → 404 externally.
 - The local KV store is disabled and the auth dir is `/tmp/cpa-auth`; the container is stateless.
 
 ## Run locally
